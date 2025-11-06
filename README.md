@@ -122,6 +122,122 @@ Its **multi-sector cognitive model** with **mandatory enforcement** allows expla
 
 ## 3. Setup
 
+OpenMemory offers **two installation methods**:
+
+1. **🌟 Global System (Recommended)** - One installation manages unlimited projects
+2. **Local Development** - Traditional per-project installation
+
+### 🌟 Global System Installation (Recommended)
+
+**Best for:** Managing multiple projects, keeping project directories clean, working with empty folders in VS Code
+
+The global system installs OpenMemory + AI Agents **once** at `~/.openmemory-global/` and manages unlimited projects from that centralized location. Projects stay completely clean with only a 3-line link file.
+
+**Architecture:**
+```
+~/.openmemory-global/           ← ONE installation
+├── backend/                    ← OpenMemory server (shared)
+├── ai-agents-template/         ← Master template
+└── projects/                   ← All project data
+
+~/Projects/ProjectA/.openmemory ← 3-line link file
+~/Projects/ProjectB/.openmemory ← 3-line link file
+~/Projects/ProjectC/.openmemory ← 3-line link file
+```
+
+**Requirements:**
+- Node.js 20+
+- Git 2.0+
+- Python 3.8+ (for project registry)
+
+**Installation:**
+
+<details>
+<summary><b>Linux / macOS Installation</b></summary>
+
+```bash
+# Clone repository
+git clone https://github.com/caviraoss/openmemory.git
+cd openmemory
+
+# Run global installation
+./.ai-agents/enforcement/install-global.sh
+
+# Reload shell
+source ~/.bashrc  # or source ~/.zshrc
+
+# Start backend (one time, serves all projects)
+openmemory-start
+```
+</details>
+
+<details>
+<summary><b>Windows Installation (PowerShell)</b></summary>
+
+```powershell
+# Clone repository
+git clone https://github.com/caviraoss/openmemory.git
+cd openmemory
+
+# Run PowerShell installation script
+.\.ai-agents\enforcement\install-global.ps1
+
+# Close and reopen PowerShell
+
+# Start backend (one time, serves all projects)
+& "$env:USERPROFILE\.openmemory-global\bin\openmemory-start.ps1"
+```
+
+**Initialize projects on Windows:**
+```powershell
+# Navigate to your project
+cd $env:USERPROFILE\Desktop\Projects\MyProject
+
+# Initialize
+& "$env:USERPROFILE\.openmemory-global\bin\openmemory-init.ps1"
+```
+
+**📖 Complete Windows guide:** See [`.ai-agents/enforcement/WINDOWS_INSTALLATION.md`](.ai-agents/enforcement/WINDOWS_INSTALLATION.md)
+</details>
+
+**Initialize projects:**
+
+```bash
+# Option 1: Manual initialization
+cd ~/Projects/MyProject
+openmemory-init
+
+# Option 2: Auto-detection (optional)
+openmemory-watch start  # Starts background watcher
+# Now just create projects - they'll be auto-initialized!
+```
+
+**For empty folders in VS Code:**
+1. File → Open Folder → Create new folder
+2. Open terminal in VS Code
+3. Run: `openmemory-init`
+4. Start coding - enforcement is active!
+
+**Management commands:**
+- `openmemory-init [dir]` - Initialize new project
+- `openmemory-start` - Start backend server
+- `openmemory-status` - Show system status
+- `openmemory-list` - List all projects
+- `openmemory-watch` - Control auto-detection watcher
+
+**Benefits:**
+- ✅ One installation manages unlimited projects
+- ✅ Projects stay clean (only 3-line file added)
+- ✅ Automatic project detection and initialization
+- ✅ Works with empty folders in VS Code
+- ✅ Easy updates (update once, affects all)
+- ✅ Centralized monitoring and logging
+- ✅ Shared backend for efficiency
+
+**📖 Complete guide:** See [`.ai-agents/enforcement/GLOBAL_SYSTEM_GUIDE.md`](.ai-agents/enforcement/GLOBAL_SYSTEM_GUIDE.md)
+
+---
+
 ### Quick Start (Local Development)
 
 Requirements:
