@@ -290,27 +290,31 @@ echo "Registering project..."
 REGISTRY="${GLOBAL_DIR}/projects/registry.json"
 TIMESTAMP=$(date -Iseconds)
 
-# Create project entry in registry (using Python for JSON manipulation)
-python3 <<PYTHON
-import json
-import sys
-from pathlib import Path
+# Create project entry in registry (using Node.js for JSON manipulation)
+node -e "
+const fs = require('fs');
+const path = require('path');
+const registryPath = path.join(process.env.HOME, '.openmemory-global', 'projects', 'registry.json');
 
-registry_file = Path("${REGISTRY}")
-registry = json.loads(registry_file.read_text())
+try {
+    const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
 
-registry["projects"]["${PROJECT_NAME}"] = {
-    "path": "${PROJECT_DIR}",
-    "initialized": "${TIMESTAMP}",
-    "last_active": "${TIMESTAMP}",
-    "openmemory_user_id": "project-${PROJECT_NAME}",
-    "status": "active"
+    registry.projects['${PROJECT_NAME}'] = {
+        path: '${PROJECT_DIR}',
+        initialized: '${TIMESTAMP}',
+        last_active: '${TIMESTAMP}',
+        openmemory_user_id: 'project-${PROJECT_NAME}',
+        status: 'active'
+    };
+    registry.updated = '${TIMESTAMP}';
+
+    fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2));
+    console.log('✓ Project registered');
+} catch (err) {
+    console.error('Error registering project:', err.message);
+    process.exit(1);
 }
-registry["updated"] = "${TIMESTAMP}"
-
-registry_file.write_text(json.dumps(registry, indent=2))
-print("✓ Project registered")
-PYTHON
+"
 
 # Create project directory in global projects folder
 mkdir -p "${GLOBAL_DIR}/projects/${PROJECT_NAME}"
