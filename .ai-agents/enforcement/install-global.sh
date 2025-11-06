@@ -186,9 +186,9 @@ if [ -n "$AI_AGENTS_SOURCE" ]; then
     cp -r "${AI_AGENTS_SOURCE}/"* "${TEMPLATE_DIR}/"
     echo -e "${GREEN}✓ Template installed from: ${AI_AGENTS_SOURCE}${NC}"
 
-    # Also copy .ai-agents to backend directory (required by backend code)
+    # Also copy .ai-agents to backend/backend directory (required by backend code)
     echo "Installing AI agents enforcement in backend..."
-    cp -r "${AI_AGENTS_SOURCE}" "${BACKEND_DIR}/"
+    cp -r "${AI_AGENTS_SOURCE}" "${BACKEND_DIR}/backend/"
     echo -e "${GREEN}✓ Backend enforcement installed${NC}"
 else
     echo -e "${YELLOW}⚠ .ai-agents directory not found, creating minimal template${NC}"
