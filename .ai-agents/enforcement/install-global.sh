@@ -122,8 +122,39 @@ echo -e "${GREEN}✓ Backend installed${NC}"
 # Create .env file if it doesn't exist
 if [ ! -f "${BACKEND_DIR}/backend/.env" ]; then
     echo "Creating .env configuration..."
-    cp "${BACKEND_DIR}/backend/.env.example" "${BACKEND_DIR}/backend/.env"
-    echo -e "${GREEN}✓ Configuration created${NC}"
+    # .env.example is at repository root, not in backend/backend/
+    if [ -f "${BACKEND_DIR}/.env.example" ]; then
+        cp "${BACKEND_DIR}/.env.example" "${BACKEND_DIR}/backend/.env"
+        echo -e "${GREEN}✓ Configuration created${NC}"
+    else
+        echo -e "${YELLOW}⚠ .env.example not found, creating default .env${NC}"
+        cat > "${BACKEND_DIR}/backend/.env" <<'ENVFILE'
+# OpenMemory Backend Configuration
+
+# Server
+PORT=8080
+
+# Database
+DATABASE_PATH=./data/openmemory.sqlite
+
+# Embeddings Provider (openai, gemini, ollama, or local)
+EMBEDDING_PROVIDER=local
+
+# OpenAI (if using openai provider)
+#OPENAI_API_KEY=your_api_key_here
+
+# Gemini (if using gemini provider)
+#GEMINI_API_KEY=your_api_key_here
+
+# Ollama (if using ollama provider)
+#OLLAMA_BASE_URL=http://localhost:11434
+#OLLAMA_MODEL=nomic-embed-text
+
+# Local embeddings (default - no API key needed)
+# Uses simple TF-IDF based embeddings
+ENVFILE
+        echo -e "${GREEN}✓ Default configuration created${NC}"
+    fi
 fi
 
 # Copy AI agents template
