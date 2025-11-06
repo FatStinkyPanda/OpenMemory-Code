@@ -2,9 +2,13 @@
   "name": "openmemory-code",
   "version": "3.0.0",
   "description": "AI Agent Development Platform with Enforced Long-Term Memory - Built on OpenMemory with automatic service management, MCP server support, and comprehensive AI agent enforcement for coding projects",
+  "bin": {
+    "openmemory-init": "./openmemory-init.js"
+  },
   "scripts": {
     "start": "node start-openmemory.js",
     "dev": "node start-openmemory.js --dev",
+    "init-project": "node openmemory-init.js",
     "build": "npm run build:backend && npm run build:context-manager && npm run build:mcp-server",
     "build:backend": "cd backend && npm run build",
     "build:context-manager": "cd .ai-agents/context-injection/context-manager && npm run build",
