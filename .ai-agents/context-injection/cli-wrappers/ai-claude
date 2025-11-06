@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+# AI Wrapper for Claude CLI
+# Usage: ai-claude [message]
+#
+
+export TOOL_NAME="claude-cli"
+export TOOL_COMMAND="claude"
+
+# Source the universal wrapper template
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/ai-wrapper-template.sh"

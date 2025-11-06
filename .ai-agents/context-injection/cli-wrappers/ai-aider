@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+# AI Wrapper for Aider (https://aider.chat)
+# Usage: ai-aider [aider options]
+#
+
+export TOOL_NAME="aider"
+export TOOL_COMMAND="aider"
+
+# Source the universal wrapper template
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/ai-wrapper-template.sh"
