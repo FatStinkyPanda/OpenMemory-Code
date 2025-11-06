@@ -122,9 +122,52 @@ Its **multi-sector cognitive model** with **mandatory enforcement** allows expla
 
 ## 3. Setup
 
-OpenMemory offers **two installation methods**:
+> 🚀 **Quick Start:** For the fastest setup, see [QUICKSTART.md](./QUICKSTART.md)
 
-1. **🌟 Global System (Recommended)** - One installation manages unlimited projects
+OpenMemory now features **automatic service management**. Start everything with a single command!
+
+### ⚡ Quick Setup (New!)
+
+**What's Changed:**
+- ✅ Single command startup - `npm start` runs everything
+- ✅ Context Manager auto-starts with backend
+- ✅ Process management handles all services automatically
+- ✅ Clean shutdown with Ctrl+C
+
+**Install and Run:**
+
+```bash
+# 1. Clone and install
+git clone https://github.com/caviraoss/openmemory.git
+cd openmemory
+npm run install:all
+
+# 2. Build everything
+npm run build
+
+# 3. Start OpenMemory (starts ALL services)
+npm start
+```
+
+**Initialize Projects:**
+
+```bash
+# In your project directory
+node /path/to/openmemory/openmemory-init.js
+
+# Or specify path
+node openmemory-init.js ~/Projects/MyNewProject
+```
+
+That's it! See [QUICKSTART.md](./QUICKSTART.md) for full details.
+
+---
+
+### Alternative Installation Methods
+
+OpenMemory also offers **traditional installation methods**:
+
+1. **🌟 Global System** - One installation manages unlimited projects (bash scripts)
 2. **Local Development** - Traditional per-project installation
 
 ### 🌟 Global System Installation (Recommended)

@@ -8,7 +8,14 @@ import { start_reflection } from '../memory/reflect'
 import { start_user_summary_reflection } from '../memory/user_summary'
 import { req_tracker_mw } from './routes/dashboard'
 import { agentEnforcement, addEnforcementEndpoints } from './middleware/ai-agent-enforcement'
-import { watchdog } from '../../.ai-agents/enforcement/watchdog'
+// Watchdog import - optional since it may not be compiled yet
+let watchdog: any = null;
+try {
+  watchdog = require('../../.ai-agents/enforcement/watchdog').watchdog;
+} catch (error) {
+  console.warn('[OpenMemory] Watchdog not available (this is okay for initial setup)');
+}
+import { processManager } from '../core/process-manager'
 
 const app = server({ max_payload_size: env.max_payload_size })
 
@@ -77,10 +84,31 @@ start_reflection()
 start_user_summary_reflection()
 
 console.log(`?? OpenMemory server starting on port ${env.port}`)
-app.listen(env.port, () => {
+app.listen(env.port, async () => {
     console.log(`? Server running on http://localhost:${env.port}`)
 
-    // Start AI Agent Enforcement Watchdog
-    console.log('[AI Agent Enforcement] Starting watchdog service...')
-    watchdog.start()
+    // Start dependent services (Context Manager, etc.)
+    console.log('')
+    console.log('='.repeat(70))
+    console.log('Starting OpenMemory ecosystem...')
+    console.log('='.repeat(70))
+    await processManager.startAll()
+
+    // Start AI Agent Enforcement Watchdog (if available)
+    if (watchdog) {
+        console.log('[AI Agent Enforcement] Starting watchdog service...')
+        watchdog.start()
+    } else {
+        console.log('[AI Agent Enforcement] Watchdog not available, skipping...')
+    }
+
+    console.log('')
+    console.log('='.repeat(70))
+    console.log('OpenMemory is ready!')
+    console.log('='.repeat(70))
+    console.log(`OpenMemory Backend: http://localhost:${env.port}`)
+    console.log('Context Manager:    http://localhost:8081')
+    console.log('MCP Server:         Stdio (started by Claude Desktop)')
+    console.log('='.repeat(70))
+    console.log('')
 })

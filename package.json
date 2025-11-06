@@ -1,0 +1,29 @@
+{
+  "name": "openmemory",
+  "version": "2.1.0",
+  "description": "Long-term memory for AI systems with enforced autonomous AI agent development",
+  "scripts": {
+    "start": "node start-openmemory.js",
+    "dev": "node start-openmemory.js --dev",
+    "build": "npm run build:backend && npm run build:context-manager && npm run build:mcp-server",
+    "build:backend": "cd backend && npm run build",
+    "build:context-manager": "cd .ai-agents/context-injection/context-manager && npm run build",
+    "build:mcp-server": "cd .ai-agents/context-injection/mcp-server && npm run build",
+    "install:all": "npm install && cd backend && npm install && cd ../.ai-agents/context-injection/context-manager && npm install && cd ../mcp-server && npm install"
+  },
+  "keywords": [
+    "ai",
+    "memory",
+    "llm",
+    "agents",
+    "openmemory",
+    "mcp",
+    "context"
+  ],
+  "author": "OpenMemory Contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/caviraoss/openmemory.git"
+  }
+}
