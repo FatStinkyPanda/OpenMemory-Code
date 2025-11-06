@@ -380,22 +380,31 @@ echo "Registered projects:"
 echo "----------------------------------------------------------------------"
 
 if [ -f "${REGISTRY}" ]; then
-    python3 <<PYTHON
-import json
-from pathlib import Path
+    # Use Node.js instead of Python (works better on Windows)
+    if command -v node &> /dev/null; then
+        node -e "
+const fs = require('fs');
+const path = require('path');
+const registryPath = path.join(process.env.HOME, '.openmemory-global', 'projects', 'registry.json');
+try {
+    const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    const projects = registry.projects || {};
 
-registry = json.loads(Path("${REGISTRY}").read_text())
-projects = registry.get("projects", {})
-
-if not projects:
-    print("  No projects registered yet.")
-else:
-    for name, info in projects.items():
-        status = info.get("status", "unknown")
-        path = info.get("path", "")
-        print(f"  • {name} ({status})")
-        print(f"    {path}")
-PYTHON
+    if (Object.keys(projects).length === 0) {
+        console.log('  No projects registered yet.');
+    } else {
+        for (const [name, info] of Object.entries(projects)) {
+            console.log(\`  • \${name} (\${info.status})\`);
+            console.log(\`    \${info.path}\`);
+        }
+    }
+} catch (err) {
+    console.log('  Error reading registry:', err.message);
+}
+"
+    else
+        echo "  Registry exists (Node.js not available for parsing)"
+    fi
 else
     echo "  Registry not found."
 fi
@@ -414,28 +423,41 @@ cat > "${BIN_DIR}/openmemory-list" <<'SCRIPT'
 GLOBAL_DIR="${HOME}/.openmemory-global"
 REGISTRY="${GLOBAL_DIR}/projects/registry.json"
 
-python3 <<PYTHON
-import json
-from pathlib import Path
+if [ -f "${REGISTRY}" ]; then
+    # Use Node.js instead of Python (works better on Windows)
+    if command -v node &> /dev/null; then
+        node -e "
+const fs = require('fs');
+const path = require('path');
+const registryPath = path.join(process.env.HOME, '.openmemory-global', 'projects', 'registry.json');
+try {
+    const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    const projects = registry.projects || {};
+    const count = Object.keys(projects).length;
 
-registry = json.loads(Path("${REGISTRY}").read_text())
-projects = registry.get("projects", {})
-
-if not projects:
-    print("No projects registered.")
-else:
-    print(f"Registered projects: {len(projects)}")
-    print("")
-    for name, info in projects.items():
-        status = info.get("status", "unknown")
-        path = info.get("path", "")
-        initialized = info.get("initialized", "")
-        print(f"{name}")
-        print(f"  Status: {status}")
-        print(f"  Path: {path}")
-        print(f"  Initialized: {initialized}")
-        print("")
-PYTHON
+    if (count === 0) {
+        console.log('No projects registered.');
+    } else {
+        console.log(\`Registered projects: \${count}\`);
+        console.log('');
+        for (const [name, info] of Object.entries(projects)) {
+            console.log(name);
+            console.log(\`  Status: \${info.status}\`);
+            console.log(\`  Path: \${info.path}\`);
+            console.log(\`  Initialized: \${info.initialized}\`);
+            console.log('');
+        }
+    }
+} catch (err) {
+    console.log('Error reading registry:', err.message);
+}
+"
+    else
+        echo "Node.js not found. Install Node.js to use this command."
+    fi
+else
+    echo "Registry not found."
+fi
 SCRIPT
 
 chmod +x "${BIN_DIR}/openmemory-list"
