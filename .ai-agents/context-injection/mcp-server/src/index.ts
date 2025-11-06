@@ -13,6 +13,8 @@ import {
   ListResourcesRequestSchema,
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -36,6 +38,41 @@ function loadProjectRegistry(): any[] {
     console.error('[MCP Server] Error loading registry:', error);
   }
   return [];
+}
+
+/**
+ * Auto-detect current project from working directory
+ */
+function detectCurrentProject(): string | null {
+  try {
+    // Try to find project by checking common project indicators
+    const projects = loadProjectRegistry();
+
+    // If only one project registered, use it
+    if (projects.length === 1) {
+      return projects[0].name;
+    }
+
+    // Try to detect from current working directory
+    const cwd = process.cwd();
+
+    // Check if CWD matches any registered project path
+    for (const project of projects) {
+      if (cwd.includes(project.path) || project.path.includes(cwd)) {
+        return project.name;
+      }
+    }
+
+    // Fallback: use the first registered project
+    if (projects.length > 0) {
+      return projects[0].name;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('[MCP Server] Error detecting project:', error);
+    return null;
+  }
 }
 
 /**
@@ -64,6 +101,7 @@ const server = new Server(
     capabilities: {
       resources: {},
       tools: {},
+      prompts: {},
     },
   }
 );
@@ -112,6 +150,162 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       },
     ],
   };
+});
+
+// ============================================================================
+// Prompts - Provide pre-defined prompts for easy context injection
+// ============================================================================
+
+/**
+ * List available prompts
+ */
+server.setRequestHandler(ListPromptsRequestSchema, async () => {
+  const projects = loadProjectRegistry();
+
+  return {
+    prompts: [
+      {
+        name: 'load_project_context',
+        description: 'Load complete OpenMemory context for a project (auto-detects current project if not specified)',
+        arguments: [
+          {
+            name: 'project_name',
+            description: 'Project name (optional - will auto-detect if not provided)',
+            required: false,
+          },
+        ],
+      },
+      {
+        name: 'quick_context',
+        description: 'Load a brief summary of current project status',
+        arguments: [
+          {
+            name: 'project_name',
+            description: 'Project name (optional - will auto-detect if not provided)',
+            required: false,
+          },
+        ],
+      },
+    ],
+  };
+});
+
+/**
+ * Get a specific prompt with context injected
+ */
+server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params;
+
+  // Determine project name
+  let projectName = (args?.project_name as string) || null;
+  if (!projectName) {
+    projectName = detectCurrentProject();
+    if (!projectName) {
+      // Try to get from Context Manager auto-detect
+      try {
+        const response = await fetch(`${CONTEXT_MANAGER_URL}/context/auto?format=json`);
+        const data = await response.json();
+        projectName = data.project_name || 'unknown';
+      } catch {
+        projectName = 'unknown';
+      }
+    }
+  }
+
+  if (name === 'load_project_context') {
+    // Handle case where project cannot be detected
+    if (!projectName || projectName === 'unknown') {
+      return {
+        description: 'Could not detect project',
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: 'Could not auto-detect current project. Please specify project_name parameter, or ensure you have registered projects in OpenMemory.',
+            },
+          },
+        ],
+      };
+    }
+
+    // Fetch full context
+    const context = await fetchContext(projectName);
+
+    return {
+      description: `Complete OpenMemory context for project: ${projectName}`,
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: `I'm working on the "${projectName}" project. Here's the complete context from OpenMemory:\n\n${context}\n\nPlease use this context to inform your responses. You can record decisions and actions using the available tools.`,
+          },
+        },
+      ],
+    };
+  }
+
+  if (name === 'quick_context') {
+    // Handle case where project cannot be detected
+    if (!projectName || projectName === 'unknown') {
+      return {
+        description: 'Could not detect project',
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: 'Could not auto-detect current project. Please specify project_name parameter, or ensure you have registered projects in OpenMemory.',
+            },
+          },
+        ],
+      };
+    }
+
+    // Fetch context and extract just the summary
+    try {
+      const response = await fetch(`${CONTEXT_MANAGER_URL}/context/${projectName}?format=json`);
+      const data = await response.json();
+      const contextData = data;
+
+      const summary = [
+        `Project: ${projectName}`,
+        `Mode: ${contextData.mode || 'INITIALIZE'}`,
+        `Phase: ${contextData.state?.project_metadata?.current_phase || 'Unknown'}`,
+        `Progress: ${contextData.state?.project_metadata?.progress_percentage || 0}%`,
+        `Recent activities: ${contextData.history_count || 0} recorded`,
+      ].join('\n');
+
+      return {
+        description: `Quick summary for project: ${projectName}`,
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: `I'm working on "${projectName}". Here's a quick summary:\n\n${summary}\n\nFor full context, use the "load_project_context" prompt. You can record decisions and actions using the available tools.`,
+            },
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        description: `Quick summary for project: ${projectName}`,
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: `I'm working on "${projectName}". Could not fetch quick summary. Use "load_project_context" for full context.`,
+            },
+          },
+        ],
+      };
+    }
+  }
+
+  throw new Error(`Unknown prompt: ${name}`);
 });
 
 // ============================================================================
@@ -411,6 +605,11 @@ async function main() {
   console.error('Capabilities:');
   console.error('  • Resources: Project context from OpenMemory');
   console.error('  • Tools: Record decisions, actions, patterns');
+  console.error('  • Prompts: One-click context injection');
+  console.error('');
+  console.error('Available Prompts:');
+  console.error('  • load_project_context - Full context with auto-detection');
+  console.error('  • quick_context - Brief project summary');
   console.error('');
   console.error('Ready to accept connections from MCP clients.');
   console.error('================================================================');
