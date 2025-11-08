@@ -360,7 +360,7 @@ app.post('/', authenticateToken, async (req: Request, res: Response) => {
         }
         else if (name === 'update_state') {
           const response = await fetch(`${OPENMEMORY_URL}/ai-agents/state`, {
-            method: 'PUT',
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(args),
           });
@@ -378,32 +378,32 @@ app.post('/', authenticateToken, async (req: Request, res: Response) => {
         else if (name === 'get_history') {
           const projectName = (args as any)?.project_name;
           const limit = (args as any)?.limit || 50;
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/history?project_name=${projectName}&limit=${limit}`);
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/history/${projectName}?limit=${limit}`);
           result = await response.json();
         }
         else if (name === 'get_patterns') {
           const projectName = (args as any)?.project_name;
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/patterns?project_name=${projectName}`);
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/patterns/${projectName}`);
           result = await response.json();
         }
         else if (name === 'get_decisions') {
           const projectName = (args as any)?.project_name;
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/decisions?project_name=${projectName}`);
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/decisions/${projectName}`);
           result = await response.json();
         }
         else if (name === 'get_emotions') {
           const projectName = (args as any)?.project_name;
           const limit = (args as any)?.limit || 50;
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/emotions?project_name=${projectName}&limit=${limit}`);
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/emotions/${projectName}?limit=${limit}`);
           result = await response.json();
         }
         else if (name === 'get_sentiment') {
           const projectName = (args as any)?.project_name;
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/sentiment?project_name=${projectName}`);
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/sentiment/${projectName}`);
           result = await response.json();
         }
         else if (name === 'get_important_memories') {
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/important-memories`, {
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/important`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(args),
@@ -420,35 +420,40 @@ app.post('/', authenticateToken, async (req: Request, res: Response) => {
           result = await response.json();
         }
         else if (name === 'get_memory_graph') {
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/memory-graph`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(args),
-          });
+          const memoryId = (args as any)?.memory_id;
+          const depth = (args as any)?.depth || 2;
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/graph/${memoryId}?depth=${depth}`);
           result = await response.json();
         }
         else if (name === 'reinforce_memory') {
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/reinforce`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(args),
-          });
-          result = await response.json();
+          const memoryId = (args as any)?.memory_id;
+          const reason = (args as any)?.reason;
+          const boost = (args as any)?.boost;
+          // Check if we should use smart-reinforce (with reason) or simple reinforce
+          if (reason) {
+            const response = await fetch(`${OPENMEMORY_URL}/ai-agents/smart-reinforce`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(args),
+            });
+            result = await response.json();
+          } else {
+            const response = await fetch(`${OPENMEMORY_URL}/ai-agents/reinforce/${memoryId}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ boost }),
+            });
+            result = await response.json();
+          }
         }
         else if (name === 'get_memory_metrics') {
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/memory-metrics`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(args),
-          });
+          const memoryId = (args as any)?.memory_id;
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/metrics/${memoryId}`);
           result = await response.json();
         }
         else if (name === 'refresh_context') {
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/refresh-context`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(args),
-          });
+          const projectName = (args as any)?.project_name;
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/context/${projectName}`);
           result = await response.json();
         }
         // === PATTERN DETECTION ===
@@ -461,137 +466,120 @@ app.post('/', authenticateToken, async (req: Request, res: Response) => {
           result = await response.json();
         }
         else if (name === 'extract_success_patterns') {
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/extract-success-patterns`, {
+          const projectName = (args as any)?.project_name;
+          const lookbackDays = (args as any)?.lookback_days;
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/learn/patterns/${projectName}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(args),
+            body: JSON.stringify({ lookback_days: lookbackDays }),
           });
           result = await response.json();
         }
         else if (name === 'get_learning_stats') {
           const projectName = (args as any)?.project_name;
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/learning-stats?project_name=${projectName}`);
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/learn/stats/${projectName}`);
           result = await response.json();
         }
         // === VALIDATION ===
         else if (name === 'validate_consistency') {
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/validate-consistency`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(args),
-          });
+          const projectName = (args as any)?.project_name;
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/validate/consistency/${projectName}`);
           result = await response.json();
         }
         else if (name === 'validate_effectiveness') {
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/validate-effectiveness`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(args),
-          });
+          const projectName = (args as any)?.project_name;
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/validate/effectiveness/${projectName}`);
           result = await response.json();
         }
         else if (name === 'validate_decisions') {
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/validate-decisions`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(args),
-          });
+          const projectName = (args as any)?.project_name;
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/validate/decisions/${projectName}`);
           result = await response.json();
         }
         else if (name === 'validate_all') {
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/validate-all`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(args),
-          });
+          const projectName = (args as any)?.project_name;
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/validate/${projectName}`);
           result = await response.json();
         }
         // === SELF-CORRECTION ===
         else if (name === 'analyze_failures') {
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/analyze-failures`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(args),
-          });
+          const projectName = (args as any)?.project_name;
+          const lookbackDays = (args as any)?.lookback_days;
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/analyze/failures/${projectName}?lookback_days=${lookbackDays || 30}`);
           result = await response.json();
         }
         else if (name === 'get_lessons_learned') {
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/lessons-learned`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(args),
-          });
+          const projectName = (args as any)?.project_name;
+          const limit = (args as any)?.limit || 20;
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/lessons/${projectName}?limit=${limit}`);
           result = await response.json();
         }
         else if (name === 'adjust_confidence') {
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/adjust-confidence`, {
+          const projectName = (args as any)?.project_name;
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/adjust/confidence/${projectName}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(args),
+            body: JSON.stringify({}),
           });
           result = await response.json();
         }
         else if (name === 'get_confidence_distribution') {
           const projectName = (args as any)?.project_name;
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/confidence-distribution?project_name=${projectName}`);
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/confidence/distribution/${projectName}`);
           result = await response.json();
         }
         else if (name === 'consolidate_memories') {
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/consolidate-memories`, {
+          const projectName = (args as any)?.project_name;
+          const options = (args as any)?.options;
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/consolidate/${projectName}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(args),
+            body: JSON.stringify({ options }),
           });
           result = await response.json();
         }
         // === PROACTIVE INTELLIGENCE ===
         else if (name === 'detect_conflicts') {
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/detect-conflicts`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(args),
-          });
+          const projectName = (args as any)?.project_name;
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/detect/conflicts/${projectName}`);
           result = await response.json();
         }
         else if (name === 'predict_blockers') {
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/predict-blockers`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(args),
-          });
+          const projectName = (args as any)?.project_name;
+          const lookbackDays = (args as any)?.lookback_days;
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/predict/blockers/${projectName}?lookback_days=${lookbackDays || 30}`);
           result = await response.json();
         }
         else if (name === 'generate_recommendations') {
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/generate-recommendations`, {
+          const projectName = (args as any)?.project_name;
+          const context = (args as any)?.context;
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/recommend/${projectName}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(args),
+            body: JSON.stringify({ context }),
           });
           result = await response.json();
         }
         // === QUALITY & MONITORING ===
         else if (name === 'run_quality_gate') {
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/run-quality-gate`, {
+          const projectName = (args as any)?.project_name;
+          const context = (args as any)?.context;
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/quality/gate/${projectName}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(args),
+            body: JSON.stringify({ context }),
           });
           result = await response.json();
         }
         else if (name === 'get_quality_trends') {
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/quality-trends`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(args),
-          });
+          const projectName = (args as any)?.project_name;
+          const days = (args as any)?.days || 30;
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/quality/trends/${projectName}?days=${days}`);
           result = await response.json();
         }
         else if (name === 'detect_anomalies') {
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/detect-anomalies`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(args),
-          });
+          const projectName = (args as any)?.project_name;
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/detect/anomalies/${projectName}`);
           result = await response.json();
         }
         // === USAGE MONITORING ===
@@ -613,10 +601,12 @@ app.post('/', authenticateToken, async (req: Request, res: Response) => {
         }
         // === COMPREHENSIVE ===
         else if (name === 'run_autonomous_intelligence') {
-          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/run-autonomous-intelligence`, {
+          const projectName = (args as any)?.project_name;
+          const context = (args as any)?.context;
+          const response = await fetch(`${OPENMEMORY_URL}/ai-agents/autonomous/${projectName}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(args),
+            body: JSON.stringify({ context }),
           });
           result = await response.json();
         }
