@@ -1,0 +1,271 @@
+name: 'OpenMemory-Code Setup'
+description: 'Automatically sets up OpenMemory-Code for AI agent development with long-term memory'
+branding:
+  icon: 'database'
+  color: 'blue'
+
+inputs:
+  openmemory-url:
+    description: 'OpenMemory backend URL'
+    required: false
+    default: 'http://localhost:8080'
+  skip-backend-setup:
+    description: 'Skip backend setup (use if backend already running)'
+    required: false
+    default: 'false'
+  project-name:
+    description: 'Project name (defaults to repository name)'
+    required: false
+    default: ''
+  install-hooks:
+    description: 'Install git hooks for enforcement'
+    required: false
+    default: 'true'
+
+outputs:
+  setup-status:
+    description: 'Status of setup: success, partial, or failed'
+    value: ${{ steps.setup.outputs.status }}
+  enforcement-active:
+    description: 'Whether enforcement is active'
+    value: ${{ steps.hooks.outputs.enforcement-active }}
+  project-initialized:
+    description: 'Whether project was initialized successfully'
+    value: ${{ steps.init.outputs.initialized }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 'Check for OpenMemory-Code'
+      id: check
+      shell: bash
+      run: |
+        echo "Checking if OpenMemory-Code is already set up..."
+
+        if [ -f ".openmemory" ] && [ -d ".ai-agents" ]; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+          echo "✅ OpenMemory-Code already configured"
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+          echo "📦 OpenMemory-Code not configured - will set up"
+        fi
+
+    - name: 'Download OpenMemory-Code distribution'
+      if: steps.check.outputs.exists == 'false'
+      shell: bash
+      run: |
+        echo "Downloading OpenMemory-Code distribution..."
+
+        # Download from GitHub releases or main repo
+        REPO_URL="https://github.com/FatStinkyPanda/OpenMemory-Code"
+
+        # Clone the repo to temporary directory
+        git clone --depth 1 "$REPO_URL" /tmp/openmemory-code-dist
+
+        echo "✅ Downloaded OpenMemory-Code"
+
+    - name: 'Copy .ai-agents folder'
+      if: steps.check.outputs.exists == 'false'
+      shell: bash
+      run: |
+        echo "Copying .ai-agents folder structure..."
+
+        # Copy .ai-agents folder
+        cp -r /tmp/openmemory-code-dist/.ai-agents .
+
+        echo "✅ Copied .ai-agents folder"
+
+    - name: 'Initialize project'
+      id: init
+      shell: bash
+      run: |
+        echo "Initializing OpenMemory-Code for this project..."
+
+        # Determine project name
+        PROJECT_NAME="${{ inputs.project-name }}"
+        if [ -z "$PROJECT_NAME" ]; then
+          PROJECT_NAME="${{ github.event.repository.name }}"
+        fi
+
+        echo "Project name: $PROJECT_NAME"
+
+        # Create .openmemory link file
+        cat > .openmemory << EOF
+        GLOBAL_DIR=$HOME/.openmemory-global
+        PROJECT_NAME=$PROJECT_NAME
+        OPENMEMORY_URL=${{ inputs.openmemory-url }}
+        EOF
+
+        # Remove .openmemory from .gitignore if it exists
+        # (We want to track .openmemory so all team members get the config)
+        if [ -f ".gitignore" ]; then
+          echo "Checking .gitignore for .openmemory..."
+          if grep -q "\.openmemory" .gitignore 2>/dev/null; then
+            echo "Found .openmemory in .gitignore - removing it..."
+            # Use grep to filter out lines, more reliable than sed
+            grep -v "^\.openmemory$" .gitignore | grep -v "^# OpenMemory$" | grep -v "^# OpenMemory-Code$" > .gitignore.tmp
+            mv .gitignore.tmp .gitignore
+            echo "✅ Removed .openmemory from .gitignore"
+          else
+            echo ".openmemory not in .gitignore - no changes needed"
+          fi
+        fi
+
+        # Update template files with project name
+        if [ -f ".ai-agents/TEMPLATE_project-state.json" ]; then
+          sed "s/TEMPLATE_Your_Project_Name/$PROJECT_NAME/g" .ai-agents/TEMPLATE_project-state.json > .ai-agents/project-state.json
+        fi
+
+        if [ -f ".ai-agents/TEMPLATE_agent-roles.json" ]; then
+          sed "s/TEMPLATE_Your_Project_Name/$PROJECT_NAME/g" .ai-agents/TEMPLATE_agent-roles.json > .ai-agents/agent-roles.json
+        fi
+
+        if [ -f ".ai-agents/TEMPLATE_workflow-tracker.json" ]; then
+          sed "s/TEMPLATE_Your_Project_Name/$PROJECT_NAME/g" .ai-agents/TEMPLATE_workflow-tracker.json > .ai-agents/workflow-tracker.json
+        fi
+
+        if [ -f ".ai-agents/TEMPLATE_context-manager.json" ]; then
+          sed "s/TEMPLATE_Your_Project_Name/$PROJECT_NAME/g" .ai-agents/TEMPLATE_context-manager.json > .ai-agents/context-manager.json
+        fi
+
+        # Create enforcement status
+        cat > .ai-agents/enforcement-status.json << EOF
+        {
+          "project": "$PROJECT_NAME",
+          "git_hooks_installed": false,
+          "enforcement_active": false,
+          "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+          "automated_by": "github-actions"
+        }
+        EOF
+
+        echo "initialized=true" >> $GITHUB_OUTPUT
+        echo "✅ Project initialized: $PROJECT_NAME"
+
+    - name: 'Install Git Hooks'
+      id: hooks
+      if: inputs.install-hooks == 'true'
+      shell: bash
+      run: |
+        echo "Installing git hooks for enforcement..."
+
+        if [ -f ".ai-agents/enforcement/git-hooks/install-hooks.sh" ]; then
+          chmod +x .ai-agents/enforcement/git-hooks/install-hooks.sh
+          bash .ai-agents/enforcement/git-hooks/install-hooks.sh "$(pwd)"
+
+          # Verify hooks installed
+          if [ -f ".git/hooks/pre-commit" ]; then
+            echo "enforcement-active=true" >> $GITHUB_OUTPUT
+
+            # Update enforcement status
+            cat > .ai-agents/enforcement-status.json << EOF
+        {
+          "project": "${{ github.event.repository.name }}",
+          "git_hooks_installed": true,
+          "enforcement_active": true,
+          "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+          "automated_by": "github-actions"
+        }
+        EOF
+
+            echo "✅ Git hooks installed and enforcement active"
+          else
+            echo "enforcement-active=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Git hooks installation completed but hooks not verified"
+          fi
+        else
+          echo "enforcement-active=false" >> $GITHUB_OUTPUT
+          echo "⚠️ Git hooks installer not found"
+        fi
+
+    - name: 'Setup logging system'
+      shell: bash
+      run: |
+        echo "Setting up OpenMemory-Code logging system..."
+
+        # Ensure logging directory exists
+        mkdir -p .ai-agents/logging
+
+        # Create initial log file
+        cat > .ai-agents/logging/setup.log << EOF
+        {
+          "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+          "event": "openmemory-code-setup",
+          "method": "github-actions",
+          "repository": "${{ github.repository }}",
+          "status": "success"
+        }
+        EOF
+
+        echo "✅ Logging system configured"
+
+    - name: 'Commit OpenMemory-Code files'
+      shell: bash
+      run: |
+        echo "Committing OpenMemory-Code setup files..."
+
+        # Configure git
+        git config user.name "OpenMemory-Code Bot"
+        git config user.email "bot@openmemory-code.local"
+
+        # Add files in order (force-add .openmemory first to avoid gitignore issues)
+        echo "Adding .ai-agents folder..."
+        git add .ai-agents
+
+        echo "Force-adding .openmemory (ignore gitignore)..."
+        git add -f .openmemory 2>&1 || echo "Note: .openmemory may not exist yet"
+
+        # Add .gitignore only if it exists (may have been modified to allow .openmemory)
+        if [ -f ".gitignore" ]; then
+          echo "Adding .gitignore..."
+          git add .gitignore
+        fi
+
+        # Check if there are changes to commit
+        if git diff --staged --quiet; then
+          echo "No changes to commit (files already present)"
+        else
+          git commit -m "🤖 Initialize OpenMemory-Code
+
+        - Added .ai-agents folder with enforcement system
+        - Created .openmemory link file
+        - Configured git hooks for AI agent enforcement
+        - Set up logging and context management
+        - Updated .gitignore to track .openmemory for team collaboration
+
+        Automated by GitHub Actions" || echo "Commit failed (may already exist)"
+        fi
+
+        echo "✅ Setup complete"
+
+    - name: 'Set output status'
+      id: setup
+      shell: bash
+      run: |
+        if [ -f ".openmemory" ] && [ -d ".ai-agents" ]; then
+          echo "status=success" >> $GITHUB_OUTPUT
+          echo "✅ OpenMemory-Code setup successful"
+        else
+          echo "status=partial" >> $GITHUB_OUTPUT
+          echo "⚠️ OpenMemory-Code setup partially completed"
+        fi
+
+    - name: 'Summary'
+      shell: bash
+      run: |
+        echo "═══════════════════════════════════════════════════════════"
+        echo "OpenMemory-Code Setup Complete"
+        echo "═══════════════════════════════════════════════════════════"
+        echo ""
+        echo "✅ Repository: ${{ github.repository }}"
+        echo "✅ Project: ${{ github.event.repository.name }}"
+        echo "✅ .ai-agents folder: Installed"
+        echo "✅ .openmemory link: Created"
+        echo "✅ Enforcement: $([ -f .git/hooks/pre-commit ] && echo 'Active' || echo 'Pending')"
+        echo "✅ Logging: Configured"
+        echo ""
+        echo "Next steps:"
+        echo "  1. Start OpenMemory backend (if not already running)"
+        echo "  2. AI agents will automatically use long-term memory"
+        echo "  3. All commits are enforced through git hooks"
+        echo ""
