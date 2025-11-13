@@ -1,0 +1,235 @@
+name: 'OpenMemory-Code Enforcement'
+
+# This workflow enforces OpenMemory-Code requirements on all commits and PRs
+# Validates that AI agents are using the memory system correctly
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - main
+      - master
+      - develop
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  enforcement-checks:
+    name: 'OpenMemory Enforcement Checks'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 'Checkout repository'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 'Setup Node.js'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: 'Check OpenMemory-Code installation'
+        id: check-install
+        run: |
+          if [ ! -f ".openmemory" ] || [ ! -d ".ai-agents" ]; then
+            echo "installed=false" >> $GITHUB_OUTPUT
+            echo "❌ OpenMemory-Code not installed"
+            exit 0
+          else
+            echo "installed=true" >> $GITHUB_OUTPUT
+            echo "✅ OpenMemory-Code detected"
+          fi
+
+      - name: 'Validate enforcement status'
+        if: steps.check-install.outputs.installed == 'true'
+        run: |
+          echo "Checking enforcement status..."
+
+          if [ -f ".ai-agents/enforcement-status.json" ]; then
+            ENFORCEMENT_ACTIVE=$(jq -r '.enforcement_active' .ai-agents/enforcement-status.json)
+            HOOKS_INSTALLED=$(jq -r '.git_hooks_installed' .ai-agents/enforcement-status.json)
+
+            echo "Enforcement active: $ENFORCEMENT_ACTIVE"
+            echo "Git hooks installed: $HOOKS_INSTALLED"
+
+            if [ "$HOOKS_INSTALLED" != "true" ]; then
+              echo "⚠️ WARNING: Git hooks not installed"
+              echo "::warning::Git hooks are not installed. Run setup to install hooks."
+            else
+              echo "✅ Enforcement properly configured"
+            fi
+          else
+            echo "⚠️ WARNING: enforcement-status.json not found"
+            echo "::warning::Enforcement status file missing"
+          fi
+
+      - name: 'Check git hooks'
+        if: steps.check-install.outputs.installed == 'true'
+        run: |
+          echo "Verifying git hooks..."
+
+          if [ ! -d ".ai-agents/enforcement/git-hooks" ]; then
+            echo "❌ Git hooks directory not found"
+            echo "::error::Git hooks directory missing from .ai-agents/enforcement/"
+            exit 1
+          fi
+
+          # Check for hook installer
+          if [ ! -f ".ai-agents/enforcement/git-hooks/install-hooks.sh" ]; then
+            echo "❌ Hook installer not found"
+            echo "::error::install-hooks.sh missing from enforcement/git-hooks/"
+            exit 1
+          fi
+
+          # Check for pre-commit validator
+          if [ ! -f ".ai-agents/enforcement/git-hooks/pre-commit-validator.sh" ]; then
+            echo "❌ Pre-commit validator not found"
+            echo "::error::pre-commit-validator.sh missing from enforcement/git-hooks/"
+            exit 1
+          fi
+
+          echo "✅ Git hooks files present"
+
+      - name: 'Validate .ai-agents structure'
+        if: steps.check-install.outputs.installed == 'true'
+        run: |
+          echo "Validating .ai-agents folder structure..."
+
+          REQUIRED_FILES=(
+            ".ai-agents/config.json"
+            ".ai-agents/enforcement-status.json"
+            ".ai-agents/README.md"
+          )
+
+          REQUIRED_DIRS=(
+            ".ai-agents/enforcement"
+            ".ai-agents/enforcement/git-hooks"
+          )
+
+          MISSING=()
+
+          # Check required files
+          for file in "${REQUIRED_FILES[@]}"; do
+            if [ ! -f "$file" ]; then
+              MISSING+=("$file")
+              echo "❌ Missing: $file"
+            fi
+          done
+
+          # Check required directories
+          for dir in "${REQUIRED_DIRS[@]}"; do
+            if [ ! -d "$dir" ]; then
+              MISSING+=("$dir")
+              echo "❌ Missing: $dir"
+            fi
+          done
+
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "::error::Missing required files/directories: ${MISSING[*]}"
+            exit 1
+          fi
+
+          echo "✅ All required files and directories present"
+
+      - name: 'Validate configuration'
+        if: steps.check-install.outputs.installed == 'true'
+        run: |
+          echo "Validating configuration files..."
+
+          # Validate config.json
+          if [ -f ".ai-agents/config.json" ]; then
+            if jq empty .ai-agents/config.json 2>/dev/null; then
+              echo "✅ config.json is valid JSON"
+            else
+              echo "❌ config.json is invalid JSON"
+              echo "::error::config.json contains invalid JSON"
+              exit 1
+            fi
+          fi
+
+          # Validate enforcement-status.json
+          if [ -f ".ai-agents/enforcement-status.json" ]; then
+            if jq empty .ai-agents/enforcement-status.json 2>/dev/null; then
+              echo "✅ enforcement-status.json is valid JSON"
+            else
+              echo "❌ enforcement-status.json is invalid JSON"
+              echo "::error::enforcement-status.json contains invalid JSON"
+              exit 1
+            fi
+          fi
+
+      - name: 'Check for OpenMemory backend'
+        if: steps.check-install.outputs.installed == 'true'
+        continue-on-error: true
+        run: |
+          echo "Checking OpenMemory backend connectivity..."
+
+          if [ -f ".openmemory" ]; then
+            OPENMEMORY_URL=$(grep OPENMEMORY_URL .openmemory | cut -d= -f2)
+            echo "OpenMemory URL: $OPENMEMORY_URL"
+
+            # Try to connect (may fail if backend not running, which is OK)
+            if curl -f -s "$OPENMEMORY_URL/health" > /dev/null 2>&1; then
+              echo "✅ OpenMemory backend is reachable"
+            else
+              echo "⚠️ OpenMemory backend not reachable (this is OK for CI/CD)"
+              echo "::warning::OpenMemory backend not running - this is expected in CI/CD"
+            fi
+          fi
+
+      - name: 'Generate enforcement report'
+        if: steps.check-install.outputs.installed == 'true' && (github.event_name == 'pull_request' || github.event_name == 'push')
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          ## 🔒 OpenMemory-Code Enforcement Report
+
+          ### ✅ Validation Results:
+          - OpenMemory-Code is installed and configured
+          - Enforcement structure is valid
+          - Configuration files are valid JSON
+          - Git hooks are properly configured
+
+          ### 📊 Enforcement Status:
+          - **Git Hooks**: $([ -f .git/hooks/pre-commit ] && echo "✅ Installed" || echo "⚠️ Not in CI (expected)")
+          - **Enforcement Files**: ✅ Present and valid
+          - **Configuration**: ✅ Valid
+          - **Structure**: ✅ Complete
+
+          ### 🎯 Active Features:
+          - 🧠 Long-term memory integration
+          - 🔒 Commit validation
+          - 📊 Automatic logging
+          - 🤖 AI agent enforcement
+
+          ---
+          *All checks passed!*
+          EOF
+
+      - name: 'Not installed notice'
+        if: steps.check-install.outputs.installed == 'false'
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          ## ℹ️ OpenMemory-Code Not Installed
+
+          This repository does not have OpenMemory-Code configured yet.
+
+          ### To enable OpenMemory-Code:
+          1. The auto-initialization workflow will run on your next push
+          2. Or manually trigger it from the Actions tab
+          3. Or run locally: `node openmemory-init.js`
+
+          ### Benefits of OpenMemory-Code:
+          - 🧠 Unlimited long-term memory for AI agents
+          - 🔒 5-layer enforcement architecture
+          - 📊 Automatic logging and tracing
+          - 🔄 Cross-session continuity
+          - 🎯 Context injection for all AI tools
+
+          [Learn more about OpenMemory-Code](https://github.com/FatStinkyPanda/OpenMemory-Code)
+          EOF

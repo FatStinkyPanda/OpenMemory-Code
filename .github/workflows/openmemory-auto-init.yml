@@ -1,0 +1,121 @@
+name: 'OpenMemory-Code Auto-Initialize'
+
+# This workflow automatically sets up OpenMemory-Code on first commit/push
+# It can also be triggered manually for existing repositories
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force re-initialization even if already set up'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-and-setup:
+    name: 'Check and Setup OpenMemory-Code'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 'Checkout repository'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 'Check if setup needed'
+        id: check
+        run: |
+          # Check if already set up
+          if [ -f ".openmemory" ] && [ -d ".ai-agents" ] && [ "${{ github.event.inputs.force }}" != "true" ]; then
+            echo "needed=false" >> $GITHUB_OUTPUT
+            echo "✅ OpenMemory-Code already configured - skipping"
+          else
+            echo "needed=true" >> $GITHUB_OUTPUT
+            echo "📦 OpenMemory-Code setup needed"
+          fi
+
+      - name: 'Setup OpenMemory-Code'
+        if: steps.check.outputs.needed == 'true'
+        uses: ./.github/actions/openmemory-setup
+        with:
+          openmemory-url: 'http://localhost:8080'
+          install-hooks: 'true'
+          project-name: ${{ github.event.repository.name }}
+
+      - name: 'Push changes'
+        if: steps.check.outputs.needed == 'true'
+        run: |
+          # Push the commit created by the action
+          git push origin ${{ github.ref_name }} || echo "Push failed - changes may already be on remote"
+
+      - name: 'Create summary'
+        if: steps.check.outputs.needed == 'true'
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 🤖 OpenMemory-Code Initialized
+
+          Your repository has been automatically configured with OpenMemory-Code!
+
+          ### What was installed:
+          - ✅ **.ai-agents folder** - Complete enforcement and context system
+          - ✅ **.openmemory link** - Connection to OpenMemory backend
+          - ✅ **Git hooks** - Automatic enforcement on commits
+          - ✅ **Logging system** - Track all AI agent actions
+          - ✅ **Configuration files** - Pre-configured templates
+
+          ### Next Steps:
+
+          1. **Start OpenMemory Backend:**
+             \`\`\`bash
+             # Clone OpenMemory-Code if you haven't
+             git clone https://github.com/FatStinkyPanda/OpenMemory-Code.git
+             cd OpenMemory-Code
+             npm start
+             \`\`\`
+
+          2. **Pull the changes:**
+             \`\`\`bash
+             git pull
+             \`\`\`
+
+          3. **Start coding!**
+             - AI agents (Claude Code, etc.) will automatically use long-term memory
+             - All actions are recorded in OpenMemory
+             - Enforcement hooks validate all commits
+
+          ### Features enabled:
+          - 🧠 **Unlimited long-term memory** for AI agents
+          - 🔒 **5-layer enforcement** architecture
+          - 📊 **Automatic logging** and tracing
+          - 🔄 **Cross-session continuity**
+          - 🎯 **Context injection** for all AI tools
+
+          ---
+          *Powered by [OpenMemory-Code](https://github.com/FatStinkyPanda/OpenMemory-Code)*
+          EOF
+
+      - name: 'No setup needed'
+        if: steps.check.outputs.needed == 'false'
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## ✅ OpenMemory-Code Already Configured
+
+          This repository already has OpenMemory-Code installed.
+
+          To force re-initialization:
+          1. Go to **Actions** tab
+          2. Select **OpenMemory-Code Auto-Initialize** workflow
+          3. Click **Run workflow**
+          4. Check **Force re-initialization** option
+
+          EOF

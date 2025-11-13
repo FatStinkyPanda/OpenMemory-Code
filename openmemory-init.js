@@ -154,15 +154,13 @@ OPENMEMORY_URL=http://localhost:8080
     log('✅ Created .openmemory link file', colors.green);
   }
 
-  // Create .gitignore entry (if .gitignore exists)
-  const gitignorePath = path.join(projectDir, '.gitignore');
-  if (fs.existsSync(gitignorePath)) {
-    const gitignore = fs.readFileSync(gitignorePath, 'utf-8');
-    if (!gitignore.includes('.openmemory')) {
-      fs.appendFileSync(gitignorePath, '\n# OpenMemory\n.openmemory\n');
-      log('✅ Added .openmemory to .gitignore', colors.green);
-    }
-  }
+  // NOTE: .openmemory should be tracked in git for team collaboration
+  // If using GitHub Actions, .openmemory will be committed automatically
+  // For local-only setup, you may want to add it to .gitignore manually
+
+  // Don't automatically add .openmemory to .gitignore anymore
+  // (Changed to support GitHub Actions workflow deployment)
+  log('ℹ️  .openmemory will be tracked in git (not added to .gitignore)', colors.blue);
 
   // Create .ai-agents directory structure
   const aiAgentsDir = path.join(projectDir, '.ai-agents');
